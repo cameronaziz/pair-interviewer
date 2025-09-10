@@ -1,0 +1,24 @@
+{
+  "name": "pair-interviewer",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:website\" \"npm run dev:extension\" \"npm run dev:fake-git\"",
+    "dev:server": "cd packages/server && npm run dev",
+    "dev:website": "cd packages/website && npm run dev",
+    "dev:extension": "cd packages/extension && npm run watch",
+    "dev:fake-git": "cd packages/fake-git && npm run dev",
+    "build": "npm run build:server && npm run build:website && npm run build:extension",
+    "build:server": "cd packages/server && npm run build",
+    "build:website": "cd packages/website && npm run build",
+    "build:extension": "cd packages/extension && npm run build",
+    "install:all": "npm install && npm run install:packages",
+    "install:packages": "cd packages/server && npm install && cd ../website && npm install && cd ../extension && npm install && cd ../fake-git && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
+}

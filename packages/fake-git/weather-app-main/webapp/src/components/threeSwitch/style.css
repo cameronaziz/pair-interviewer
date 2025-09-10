@@ -1,0 +1,51 @@
+.switch-toggle-container {
+  position: relative;
+  display: flex;
+  width: min-content;
+  white-space: nowrap;
+  align-items: center;
+  flex-direction: column;
+}
+
+.switch-toggle-title {
+  font-size: 0.8em;
+  display: block;
+  margin-bottom: 8px;
+  color:#333333;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.switch-toggle {
+  border-radius: 24px;
+  padding: 8px;
+  background-color: rgba(72, 88, 177, 0.3);
+  width: 90px;
+  height: 30px;
+  align-items: center;
+  display: flex;
+  /* border: 1px solid rgba(72, 88, 177, 0.8); */
+}
+
+.switch-toggle input {
+  display: none;
+}
+
+.switch-toggle > div > label {
+  color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  border-radius: 50%;
+  text-transform: uppercase;
+}
+
+.switch-toggle > div > input:checked + label:not(.no-show-choice) {
+  background: #4858b1;
+  color: white;
+  cursor: pointer;
+}
+

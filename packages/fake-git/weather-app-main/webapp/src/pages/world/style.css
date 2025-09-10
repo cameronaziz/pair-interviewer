@@ -1,0 +1,46 @@
+.header {
+  display: flex;
+  left: 0;
+  right: 0;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  position: absolute;
+}
+
+.inner-header {
+  border-radius: 12px;
+  background-color: rgba(234, 219, 245, 0.8);
+  border: 1px solid #282c34;
+  padding: 8px;
+  width: min-content;
+}
+
+.title {
+  margin-top: 4px;
+}
+
+.details {
+  display: flex;
+  gap: 16px;
+}
+
+.details-title {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #282c34;
+}
+
+/* 
+.svg {
+  overflow: hidden;
+  position: absolute;
+  top: 23vh;
+  left: 0;
+}
+
+.svg::after {
+  content: "";
+  display: block;
+  margin-bottom: -20%;
+} */

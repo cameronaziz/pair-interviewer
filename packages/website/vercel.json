@@ -1,0 +1,10 @@
+{
+  "env": {
+    "DEPLOYMENT": "production"
+  },
+  "functions": {
+    "app/api/**/*.js": {
+      "runtime": "@vercel/node"
+    }
+  }
+}

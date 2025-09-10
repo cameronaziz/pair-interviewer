@@ -1,0 +1,25 @@
+.tooltip-container {
+  background-color: rgba(210, 188, 226, 0.85);
+  border-radius: 8px;
+  position: absolute;
+  white-space: nowrap;
+  padding: 8px;
+}
+
+.tooltip-container > .tooltip-title {
+  font-size: 1.2em;
+  text-transform: uppercase;
+}
+
+.tooltip-container > .tooltip-content {
+  display: flex;
+  justify-content: space-evenly;
+  gap: 4px;
+}
+
+.tooltip-container > .tooltip-content > .tooltip-content-item {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  font-size: 0.8em;
+}

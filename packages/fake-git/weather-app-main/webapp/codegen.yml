@@ -1,0 +1,13 @@
+schema:  http://localhost:5000/graphql
+overwrite: true
+generates:
+  ./src/typings/schema.d.ts:
+    plugins:
+      - typescript
+      - typescript-operations
+  ./src/graphql/fragments.json:
+    plugins:
+      - fragment-matcher
+    config:
+      apolloClientVersion: 3
+      useExplicitTyping: true

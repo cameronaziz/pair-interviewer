@@ -1,0 +1,32 @@
+.input-field {
+  border-radius: 24px;
+  border: none;
+  font-size: 24px;
+  line-height: 1.5;
+  padding: 4px 12px;
+  background-color: rgba(72, 88, 177, 0.3);
+
+}
+
+.input-field-label {
+  display: block;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  color:#333333;
+  font-weight: 700;
+}
+
+.input-field:focus{
+  outline: none;
+  background-color: #fff;
+}
+
+.input-field-container {
+  position: relative;
+}
+
+.input-loading {
+  position: absolute;
+  right: 14px;
+}

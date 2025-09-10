@@ -1,0 +1,62 @@
+{
+  "name": "pair-interviewer-extension",
+  "displayName": "Pair Interviewer",
+  "description": "Record technical interviews with rrweb integration",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onCommand:pair-interviewer.startRecording",
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "pair-interviewer.startRecording",
+        "title": "Start Interview Recording",
+        "category": "Pair Interviewer"
+      },
+      {
+        "command": "pair-interviewer.stopRecording",
+        "title": "Stop Interview Recording",
+        "category": "Pair Interviewer"
+      }
+    ],
+    "configuration": {
+      "title": "Pair Interviewer",
+      "properties": {
+        "pairInterviewer.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:3001",
+          "description": "Server URL for the Pair Interviewer API"
+        },
+        "pairInterviewer.sessionId": {
+          "type": "string",
+          "description": "Current interview session ID"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "build": "npm run compile",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.4.5",
+    "@vscode/vsce": "^2.24.0"
+  },
+  "dependencies": {
+    "rrweb": "^2.0.0-alpha.13",
+    "axios": "^1.6.8",
+    "uuid": "^9.0.1",
+    "@types/uuid": "^9.0.8"
+  }
+}
