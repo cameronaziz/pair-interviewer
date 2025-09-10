@@ -3,6 +3,7 @@
 import useFetchRepo from '@/hooks/useFetchRepo';
 import useFiles from '@/hooks/useFiles';
 import { getEditorOptions } from '@/lib/monaco-loader';
+import { pyodideManager, PythonExecutionResult } from '@/lib/pyodide-manager';
 import { FileData, InterviewTemplate, TreeNode } from '@/types';
 import Editor from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
@@ -10,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getFileIcon } from './IDE/fileIcon';
 import FileTree from './IDE/FileTree';
 import Loading from './IDE/Loading';
+import PythonOutputPanel from './PythonOutputPanel';
 
 type EmbeddedVSCodeProps = {
   template: InterviewTemplate;
@@ -36,6 +38,12 @@ const EmbeddedVSCode: React.FC<EmbeddedVSCodeProps> = ({ template, sessionId }) 
   const isMountedRef = useRef(true);
   const [isFetchingRepo, fetchRepo] = useFetchRepo(template.repoUrl, template.commitHash);
   const initializedRef = useRef(false);
+  
+  // Python execution state
+  const [pythonOutputTab, setPythonOutputTab] = useState<FileData | null>(null);
+  const [pythonExecutionResult, setPythonExecutionResult] = useState<PythonExecutionResult | null>(null);
+  const [isExecutingPython, setIsExecutingPython] = useState(false);
+  const [pyodideReady, setPyodideReady] = useState(false);
   // const renderCountRef = useRef(0);
   // const nodesRef = useRef<any>([]);
 
@@ -66,19 +74,19 @@ const EmbeddedVSCode: React.FC<EmbeddedVSCodeProps> = ({ template, sessionId }) 
           }
 
           // Update files with content
-          setFiles(prevFiles =>
-            prevFiles.map(file => {
-              const loadedFile = loadedFiles.find((f: any) => f.path === file.path);
-              if (loadedFile && !(loadedFile as any).error) {
-                return {
-                  ...file,
-                  content: loadedFile.content,
-                  language: loadedFile.language
-                };
-              }
-              return file;
-            })
-          );
+          const updatedFiles = fetchedFiles.map(file => {
+            const loadedFile = loadedFiles.find((f: any) => f.path === file.path);
+            if (loadedFile && !(loadedFile as any).error) {
+              return {
+                ...file,
+                content: loadedFile.content,
+                language: loadedFile.language
+              };
+            }
+            return file;
+          });
+          
+          setFiles(updatedFiles);
 
           // Mark files as loaded
           loadedFiles.forEach((file: any) => {
@@ -86,6 +94,15 @@ const EmbeddedVSCode: React.FC<EmbeddedVSCodeProps> = ({ template, sessionId }) 
               setLoadedFiles(prev => new Set(prev).add(file.path));
             }
           });
+
+          // Initialize Pyodide and sync files
+          try {
+            await pyodideManager.waitForInitialization();
+            setPyodideReady(true);
+            await pyodideManager.syncFiles(updatedFiles);
+          } catch (error) {
+            console.error('Failed to initialize Pyodide:', error);
+          }
         }
       } catch (error) {
         if (!isCancelled && isMountedRef.current) {
@@ -313,8 +330,78 @@ const EmbeddedVSCode: React.FC<EmbeddedVSCodeProps> = ({ template, sessionId }) 
       );
 
       recordFileWrite(activeFile.path, value);
+
+      // Update Pyodide virtual file system if it's a Python file
+      if (activeFile.language === 'python' && pyodideReady) {
+        pyodideManager.updateFile(activeFile.path, value);
+      }
     }
-  }, [activeFile, recordFileWrite]);
+  }, [activeFile, recordFileWrite, pyodideReady]);
+
+  const executePythonFile = useCallback(async (filePath: string) => {
+    if (!pyodideReady) {
+      console.error('Pyodide not ready');
+      return;
+    }
+
+    setIsExecutingPython(true);
+    
+    try {
+      const result = await pyodideManager.executeFile(filePath);
+      setPythonExecutionResult(result);
+      
+      // Record the execution
+      recordFileWrite('python_execution', JSON.stringify({
+        filePath,
+        result: {
+          output: result.output,
+          error: result.error,
+          executionTime: result.executionTime
+        },
+        timestamp: Date.now()
+      }));
+    } catch (error) {
+      console.error('Python execution failed:', error);
+      setPythonExecutionResult({
+        output: '',
+        error: error instanceof Error ? error.message : String(error),
+        returnValue: null,
+        executionTime: 0
+      });
+    } finally {
+      setIsExecutingPython(false);
+    }
+  }, [pyodideReady, recordFileWrite]);
+
+  const openPythonOutput = useCallback(() => {
+    if (!pythonOutputTab) {
+      const outputFile: FileData = {
+        path: 'python_output',
+        content: '',
+        language: 'python-output',
+        size: 0,
+        type: 'file'
+      };
+      setPythonOutputTab(outputFile);
+      setOpenTabs(prev => [...prev, outputFile]);
+    }
+    setActiveFile(pythonOutputTab);
+  }, [pythonOutputTab]);
+
+  const closePythonOutput = useCallback(() => {
+    if (pythonOutputTab) {
+      setOpenTabs(prev => prev.filter(tab => tab.path !== 'python_output'));
+      setPythonOutputTab(null);
+      if (activeFile?.path === 'python_output') {
+        setActiveFile(openTabs.find(tab => tab.path !== 'python_output') || null);
+      }
+    }
+  }, [pythonOutputTab, activeFile, openTabs]);
+
+  const clearPythonOutput = useCallback(() => {
+    setPythonExecutionResult(null);
+    pyodideManager.clearExecutionHistory();
+  }, []);
 
 
 
@@ -353,6 +440,28 @@ const EmbeddedVSCode: React.FC<EmbeddedVSCodeProps> = ({ template, sessionId }) 
 
       editorRef.current = editor;
 
+      // Add Python execution command
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+        if (activeFile?.language === 'python') {
+          executePythonFile(activeFile.path);
+          openPythonOutput();
+        }
+      });
+
+      // Add command palette action
+      editor.addAction({
+        id: 'execute-python-file',
+        label: 'Execute Python File',
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+        contextMenuGroupId: 'python',
+        run: () => {
+          if (activeFile?.language === 'python') {
+            executePythonFile(activeFile.path);
+            openPythonOutput();
+          }
+        }
+      });
+
       // Focus the editor if it has a model
       try {
         if (editor && typeof editor.getModel === 'function') {
@@ -368,7 +477,7 @@ const EmbeddedVSCode: React.FC<EmbeddedVSCodeProps> = ({ template, sessionId }) 
     } catch (error) {
       console.error('Error setting up Monaco Editor:', error);
     }
-  }, []);
+  }, [activeFile, executePythonFile, openPythonOutput]);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (activeFile && value !== undefined && value !== activeFile.content) {
@@ -531,39 +640,52 @@ const EmbeddedVSCode: React.FC<EmbeddedVSCodeProps> = ({ template, sessionId }) 
           {/* Editor */}
           <div className="flex-1">
             {activeFile ? (
-              <Editor
-                key={`${activeFile.path}-${activeFile.language}`}
-                height="100%"
-                language={activeFile.language}
-                value={activeFile.content}
-                theme="vs-dark"
-                onChange={handleEditorChange}
-                onMount={handleEditorDidMount}
-                beforeMount={(monaco) => {
-                  // try {
-                  //   // Configure Monaco before mounting
-                  //   if (monaco && monaco.editor) {
-                  //     monaco.editor.setTheme('vs-dark');
-                  //   }
-                  // } catch (error) {
-                  //   console.warn('Could not set Monaco theme:', error);
-                  // }
-                }}
-                loading={
-                  <div className="flex items-center justify-center h-full text-gray-400">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                      <div>Loading Monaco Editor...</div>
+              activeFile.path === 'python_output' ? (
+                <PythonOutputPanel
+                  executionResult={pythonExecutionResult}
+                  isExecuting={isExecutingPython}
+                  onClear={clearPythonOutput}
+                />
+              ) : (
+                <Editor
+                  key={`${activeFile.path}-${activeFile.language}`}
+                  height="100%"
+                  language={activeFile.language}
+                  value={activeFile.content}
+                  theme="vs-dark"
+                  onChange={handleEditorChange}
+                  onMount={handleEditorDidMount}
+                  beforeMount={(monaco) => {
+                    // try {
+                    //   // Configure Monaco before mounting
+                    //   if (monaco && monaco.editor) {
+                    //     monaco.editor.setTheme('vs-dark');
+                    //   }
+                    // } catch (error) {
+                    //   console.warn('Could not set Monaco theme:', error);
+                    // }
+                  }}
+                  loading={
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                        <div>Loading Monaco Editor...</div>
+                      </div>
                     </div>
-                  </div>
-                }
-                options={options}
-              />
+                  }
+                  options={options}
+                />
+              )
             ) : (
               <div className="flex items-center justify-center h-full text-gray-400">
                 <div className="text-center">
                   <div className="text-4xl mb-4">📝</div>
                   <div>Select a file to start editing</div>
+                  {pyodideReady && (
+                    <div className="mt-4 text-sm text-green-400">
+                      🐍 Python execution ready! Press Ctrl+Enter to run Python files.
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -585,6 +707,28 @@ const EmbeddedVSCode: React.FC<EmbeddedVSCodeProps> = ({ template, sessionId }) 
           )}
         </div>
         <div className="flex items-center space-x-4">
+          {activeFile?.language === 'python' && pyodideReady && (
+            <button
+              onClick={() => {
+                executePythonFile(activeFile.path);
+                openPythonOutput();
+              }}
+              disabled={isExecutingPython}
+              className="flex items-center space-x-1 px-2 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-xs"
+            >
+              {isExecutingPython ? (
+                <>
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                  <span>Running...</span>
+                </>
+              ) : (
+                <>
+                  <span>🐍</span>
+                  <span>Run Python</span>
+                </>
+              )}
+            </button>
+          )}
           <span>Session: {sessionId}</span>
         </div>
       </div>
